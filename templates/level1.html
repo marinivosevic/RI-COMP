@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}CTF // Level 1{% endblock %}
+{% block content %}
+<!--
+    ============================================
+    SYSTEM LOG - CONFIDENTIAL
+    Debug flag for user verification: {{ flag }}
+    Do NOT leave this in production!
+    ============================================
+-->
+<h1>Level 1: The Surface</h1>
+<div class="card">
+    <h2>Briefing</h2>
+    <p>Welcome, agent. Every good hacker knows that what you see on screen is only part of the story.</p>
+    <p>The flag is hidden in plain sight. You just need to know where to look.</p>
+    <p style="margin-top: 1rem; color: #555;">Hint: Developers sometimes leave things in the source that they shouldn't...</p>
+</div>
+
+<div style="display:none" id="secret-data" data-flag="{{ flag }}">
+    Nothing to see here.
+</div>
+
+<div class="card">
+    <h3>Submit Flag</h3>
+    <form class="flag-form" method="POST" action="/submit">
+        <input type="hidden" name="level" value="1">
+        <input type="text" name="flag" placeholder="FLAG{...}" required>
+        <button type="submit">SUBMIT</button>
+    </form>
+</div>
+{% endblock %}

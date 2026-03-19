@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}CTF // {{ 'Captured!' if correct else 'Wrong Flag' }}{% endblock %}
+{% block content %}
+{% if correct %}
+<div class="msg success" style="text-align: center; font-size: 1.2rem;">
+    FLAG CAPTURED! Level {{ level }} complete.
+</div>
+{% else %}
+<div class="msg error" style="text-align: center; font-size: 1.2rem;">
+    WRONG FLAG. Try again, agent.
+</div>
+{% endif %}
+
+<div style="text-align: center; margin-top: 2rem;">
+    <a href="/hub" class="btn">Back to Missions</a>
+    {% if not correct %}
+    <a href="/level/{{ level }}" class="btn secondary" style="margin-left: 0.5rem;">Retry Level {{ level }}</a>
+    {% endif %}
+</div>
+{% endblock %}

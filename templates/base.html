@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CTF Challenge{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    {% if session.username %}
+    <nav>
+        <a href="/hub">[Levels]</a>
+        <a href="/scoreboard">[Scoreboard]</a>
+        <div class="spacer"></div>
+        <span class="user-info">{{ session.username }}@ctf</span>
+        <a href="/logout">[Logout]</a>
+    </nav>
+    {% endif %}
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

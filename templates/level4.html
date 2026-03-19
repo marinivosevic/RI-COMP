@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}CTF // Level 4{% endblock %}
+{% block content %}
+<h1>Level 4: Cipher</h1>
+<div class="card">
+    <h2>Briefing</h2>
+    <p>We intercepted an encrypted transmission. Intelligence suggests it uses a classical substitution cipher popularized by a famous Roman general.</p>
+    <p>Decrypt the message to reveal the flag.</p>
+</div>
+
+<div class="card">
+    <h3>Intercepted Transmission</h3>
+    <div class="cipher-text">{{ encrypted }}</div>
+
+    <div class="hint" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">
+        [+] Hint 1 (click to reveal)
+    </div>
+    <div class="hint-content">
+        The cipher is named after Julius Caesar. Each letter is shifted by a fixed number of positions in the alphabet.
+    </div>
+
+    <div class="hint" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'" style="margin-top: 0.5rem;">
+        [+] Hint 2 (click to reveal)
+    </div>
+    <div class="hint-content">
+        You know the flag format starts with <code style="color: var(--green);">FLAG{</code>. Compare the first letter of the ciphertext with 'F' to determine the shift.
+    </div>
+</div>
+
+<div class="card">
+    <h3>Submit Decrypted Flag</h3>
+    <form class="flag-form" method="POST" action="/submit">
+        <input type="hidden" name="level" value="4">
+        <input type="text" name="flag" placeholder="FLAG{...}" required>
+        <button type="submit">SUBMIT</button>
+    </form>
+</div>
+{% endblock %}

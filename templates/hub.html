@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}CTF // Levels{% endblock %}
+{% block content %}
+<h1>Mission Select</h1>
+<p>Solve each level to capture the flag. Each flag is unique to you.</p>
+
+<div class="level-grid">
+    {% for lvl in levels %}
+    <a href="/level/{{ lvl.num }}" class="level-card {{ 'solved' if lvl.solved }}">
+        <div class="level-num">#{{ lvl.num }}</div>
+        <div class="level-title">{{ lvl.title }}</div>
+        <div class="difficulty">{{ lvl.difficulty }}</div>
+        <div class="status {{ 'solved-text' if lvl.solved else 'unsolved-text' }}">
+            {{ '[ CAPTURED ]' if lvl.solved else '[ UNSOLVED ]' }}
+        </div>
+    </a>
+    {% endfor %}
+</div>
+
+{% if all_solved %}
+<!-- Victory overlay -->
+<div id="victory-overlay">
+    <canvas id="matrix-canvas"></canvas>
+    <div id="victory-content">
+        <div id="victory-title">ALL FLAGS CAPTURED</div>
+        <div id="victory-sub">Mission complete, agent. You've proven your skills.</div>
+        <div id="victory-stars">
+            <span>&#9733;</span><span>&#9733;</span><span>&#9733;</span><span>&#9733;</span><span>&#9733;</span>
+        </div>
+        <button onclick="document.getElementById('victory-overlay').style.display='none'" style="margin-top: 2rem;">CONTINUE</button>
+    </div>
+</div>
+<style>
+    #victory-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    #matrix-canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+    }
+    #victory-content {
+        position: relative;
+        z-index: 10001;
+        text-align: center;
+        animation: victoryFadeIn 1.5s ease-out;
+    }
+    #victory-title {
+        font-size: 3rem;
+        font-weight: 700;
+        color: #00ff41;
+        text-shadow: 0 0 30px #00ff41, 0 0 60px #00ff41;
+        letter-spacing: 0.15em;
+        animation: victoryPulse 2s ease-in-out infinite;
+    }
+    #victory-sub {
+        font-size: 1.1rem;
+        color: #c0c0c0;
+        margin-top: 1rem;
+        animation: victoryFadeIn 2.5s ease-out;
+    }
+    #victory-stars {
+        margin-top: 1.5rem;
+        font-size: 2.5rem;
+        display: flex;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+    #victory-stars span {
+        color: #00ff41;
+        text-shadow: 0 0 15px #00ff41;
+        animation: starPop 0.4s ease-out both;
+    }
+    #victory-stars span:nth-child(1) { animation-delay: 0.8s; }
+    #victory-stars span:nth-child(2) { animation-delay: 1.1s; }
+    #victory-stars span:nth-child(3) { animation-delay: 1.4s; }
+    #victory-stars span:nth-child(4) { animation-delay: 1.7s; }
+    #victory-stars span:nth-child(5) { animation-delay: 2.0s; }
+
+    @keyframes victoryFadeIn {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes victoryPulse {
+        0%, 100% { text-shadow: 0 0 30px #00ff41, 0 0 60px #00ff41; }
+        50% { text-shadow: 0 0 50px #00ff41, 0 0 100px #00ff41, 0 0 150px rgba(0,255,65,0.3); }
+    }
+    @keyframes starPop {
+        from { opacity: 0; transform: scale(0) rotate(-30deg); }
+        to { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+</style>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if all_solved %}
+<script>
+(function() {
+    const canvas = document.getElementById('matrix-canvas');
+    const ctx = canvas.getContext('2d');
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    const fontSize = 16;
+    const columns = Math.floor(canvas.width / fontSize);
+    const drops = new Array(columns).fill(1);
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*(){}[]FLAG';
+
+    function draw() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#00ff41';
+        ctx.font = fontSize + 'px monospace';
+
+        for (let i = 0; i < drops.length; i++) {
+            const text = chars[Math.floor(Math.random() * chars.length)];
+            const x = i * fontSize;
+            const y = drops[i] * fontSize;
+
+            // Vary brightness
+            const brightness = Math.random();
+            if (brightness > 0.95) {
+                ctx.fillStyle = '#ffffff';
+            } else if (brightness > 0.8) {
+                ctx.fillStyle = '#00ff41';
+            } else {
+                ctx.fillStyle = 'rgba(0, 255, 65, 0.5)';
+            }
+
+            ctx.fillText(text, x, y);
+
+            if (y > canvas.height && Math.random() > 0.975) {
+                drops[i] = 0;
+            }
+            drops[i]++;
+        }
+    }
+
+    setInterval(draw, 40);
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}CTF // Level 5{% endblock %}
+{% block content %}
+<!-- TODO: clean up debug references before go-live -->
+<!-- Debug API: /api/secret_ + user token -->
+<meta name="debug-endpoint" content="/api/secret_">
+<h1>Level 5: Deep Recon</h1>
+<div class="card">
+    <h2>Briefing</h2>
+    <p>This system exposes a data API. But not all endpoints are documented. Some are hidden in plain sight.</p>
+    <p>Your mission: discover the secret endpoint and retrieve your flag.</p>
+</div>
+
+<div class="card">
+    <h3>Data Dashboard</h3>
+    <p style="color: #555; font-size: 0.85rem;">Fetching from /api/data ...</p>
+    <div class="api-response" id="api-output">Loading...</div>
+</div>
+
+<div class="card">
+    <h3>Submit Flag</h3>
+    <form class="flag-form" method="POST" action="/submit">
+        <input type="hidden" name="level" value="5">
+        <input type="text" name="flag" placeholder="FLAG{...}" required>
+        <button type="submit">SUBMIT</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Dashboard data loader
+    // NOTE: only public endpoints are called here
+    // TODO: remove /api/token reference before production
+    fetch('/api/data')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('api-output').textContent = JSON.stringify(data, null, 2);
+        })
+        .catch(err => {
+            document.getElementById('api-output').textContent = 'Error loading data: ' + err;
+        });
+</script>
+{% endblock %}

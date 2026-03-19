@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}CTF // Scoreboard{% endblock %}
+{% block content %}
+<meta http-equiv="refresh" content="15">
+<h1>Scoreboard</h1>
+
+{% if board %}
+<table>
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Agent</th>
+            <th>Lvl 1</th>
+            <th>Lvl 2</th>
+            <th>Lvl 3</th>
+            <th>Lvl 4</th>
+            <th>Lvl 5</th>
+            <th>Score</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for entry in board %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td style="color: var(--green);">{{ entry.username }}</td>
+            {% for i in range(1, 6) %}
+            <td><span class="dot {{ 'on' if i in entry.solved else 'off' }}"></span></td>
+            {% endfor %}
+            <td>{{ entry.count }}/5</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="card" style="text-align: center;">
+    <p>No flags captured yet. Be the first!</p>
+</div>
+{% endif %}
+{% endblock %}
