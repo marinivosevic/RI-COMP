@@ -1,52 +1,37 @@
 {% extends "base.html" %}
 {% block title %}CTF // Level 3{% endblock %}
 {% block content %}
-<h1>Level 3: Privilege Escalation</h1>
+<h1>Level 3: Cipher</h1>
 <div class="card">
     <h2>Briefing</h2>
-    <p>You've reached a restricted area. The system uses an encoded access token stored in your browser to control permissions.</p>
-    <p>Only administrators can view the classified flag. Your current clearance is insufficient.</p>
+    <p>We intercepted an encrypted transmission. Intelligence suggests it uses a classical substitution cipher popularized by a famous Roman general.</p>
+    <p>Decrypt the message to reveal the flag.</p>
 </div>
 
 <div class="card">
-    <h3>Access Control Panel</h3>
-    <p>Current role: <strong style="color: {{ 'var(--green)' if role == 'admin' else 'var(--red)' }};">{{ role }}</strong></p>
+    <h3>Intercepted Transmission</h3>
+    <div class="cipher-text">{{ encrypted }}</div>
 
-    <div style="margin: 1rem 0; padding: 0.8rem; background: #0d0d0d; border: 1px solid #333; border-radius: 3px;">
-        <p style="font-size: 0.8rem; color: #666; margin-bottom: 0.3rem;">Your access cookie (raw):</p>
-        <code style="color: var(--green); word-break: break-all; font-size: 0.85rem;">{{ cookie_raw }}</code>
+    <div class="hint" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">
+        [+] Hint 1 (click to reveal)
+    </div>
+    <div class="hint-content">
+        The cipher is named after Julius Caesar. Each letter is shifted by a fixed number of positions in the alphabet.
     </div>
 
-    {% if cookie_decoded %}
-    <div style="margin: 0.5rem 0; padding: 0.8rem; background: #0d0d0d; border: 1px solid #333; border-radius: 3px;">
-        <p style="font-size: 0.8rem; color: #666; margin-bottom: 0.3rem;">Decoded (for your convenience):</p>
-        <code style="color: #aaa; font-size: 0.85rem;">{{ cookie_decoded }}</code>
+    <div class="hint" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'" style="margin-top: 0.5rem;">
+        [+] Hint 2 (click to reveal)
     </div>
-    {% endif %}
-
-    {% if role != 'admin' %}
-    <div class="access-denied">
-        <h2>ACCESS DENIED</h2>
-        <p>Administrator privileges required to view classified data.</p>
-        <p style="font-size: 0.8rem; color: #555; margin-top: 0.5rem;">
-            The access token is encoded and stored as a cookie. Perhaps it can be... modified?
-        </p>
+    <div class="hint-content">
+        You know the flag format starts with <code style="color: var(--green);">FLAG{</code>. Compare the first letter of the ciphertext with 'F' to determine the shift.
     </div>
-    <button class="secondary" onclick="alert('Access denied. Your access token does not grant admin privileges.\n\nHint: The cookie is base64-encoded JSON. Decode it, change your role, re-encode, and set it back.')">
-        Open Admin Panel
-    </button>
-    {% else %}
-    <div class="msg success">
-        ADMIN ACCESS GRANTED — Classified flag: <strong>{{ flag }}</strong>
-    </div>
-    {% endif %}
 </div>
 
 <div class="card">
-    <h3>Submit Flag</h3>
+    <h3>Submit Decrypted Flag</h3>
     <form class="flag-form" method="POST" action="/submit">
         <input type="hidden" name="level" value="3">
-        <input type="text" name="flag" placeholder="FLAG{...}" {% if flag %}value="{{ flag }}"{% endif %} required>
+        <input type="text" name="flag" placeholder="FLAG{...}" required>
         <button type="submit">SUBMIT</button>
     </form>
 </div>

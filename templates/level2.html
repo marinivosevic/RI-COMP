@@ -1,28 +1,42 @@
 {% extends "base.html" %}
 {% block title %}CTF // Level 2{% endblock %}
 {% block content %}
-<h1>Level 2: Network Whisper</h1>
+<h1>Level 2: Codebreaker</h1>
 <div class="card">
     <h2>Briefing</h2>
-    <p>The server is whispering something back to you with every response. But it's not visible on the page.</p>
-    <p>The message is hidden in the conversation between your browser and the server — not in the HTML.</p>
-    <p style="color: #555; margin-top: 0.5rem;">Hint: When your browser talks to a server, the response contains more than just the page content. There are... headers.</p>
+    <p>Our security team embedded a classified flag inside the page's JavaScript security module. They thought obfuscation would keep it safe.</p>
+    <p>Prove them wrong. Reverse-engineer the script and extract the flag.</p>
 </div>
 
 <div class="card">
-    <h3>Classified Terminal</h3>
-    <pre style="color: var(--green); margin: 1rem 0;">
-> GET /level/2 HTTP/1.1
-> Host: localhost:5000
->
-< HTTP/1.1 200 OK
-< Content-Type: text/html
-< X-Powered-By: Flask
-< ???: ???
-<
-< [body rendered below]
-    </pre>
-    <p style="color: #555; font-size: 0.85rem;">The response you're seeing right now has something extra. Can you find it?</p>
+    <h3>Security Module Status</h3>
+    <div style="margin: 1rem 0; padding: 0.8rem; background: #0d0d0d; border: 1px solid #333; border-radius: 3px;">
+        <p style="color: var(--green); font-size: 0.85rem;">
+            &gt; Security Module v3.7.2 loaded<br>
+            &gt; Integrity check: <span style="color: #0a0;">PASSED</span><br>
+            &gt; Obfuscation layer: <span style="color: #0a0;">ACTIVE</span><br>
+            &gt; Flag status: <span style="color: var(--red);">PROTECTED</span>
+        </p>
+    </div>
+    <p style="color: #555; font-size: 0.85rem;">The security module is loaded on this page. Use your browser's DevTools to inspect it.</p>
+</div>
+
+<div class="card">
+    <h3>Intelligence</h3>
+
+    <div class="hint" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">
+        [+] Hint 1 (click to reveal)
+    </div>
+    <div class="hint-content">
+        The script uses <strong>XOR encoding</strong>. The data is hex-encoded, and the chunks are stored in a scrambled order. Look for the reorder array and the XOR key (an array of numbers — they're character codes).
+    </div>
+
+    <div class="hint" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'" style="margin-top: 0.5rem;">
+        [+] Hint 2 (click to reveal)
+    </div>
+    <div class="hint-content">
+        Read the code carefully — there's a debug hook. Try setting <code>window.__RICOMP_DEBUG = true</code> in the console <strong>before</strong> the script runs. Or copy the decode functions into your console and call them yourself.
+    </div>
 </div>
 
 <div class="card">
@@ -33,4 +47,10 @@
         <button type="submit">SUBMIT</button>
     </form>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{{ obfuscated_js | safe }}
+</script>
 {% endblock %}

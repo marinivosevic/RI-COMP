@@ -12,6 +12,7 @@ import base64
 import json as _json
 import time
 import re
+import hmac as _hmac
 from functools import wraps
 from contextlib import contextmanager
 
@@ -92,29 +93,6 @@ def generate_flag(username: str, level: int) -> str:
     return f'FLAG{{{body}}}'
 
 
-def get_level4_shift(username: str) -> int:
-    rng = get_user_rng(username, 4)
-    rng.choices(string.ascii_uppercase + string.digits, k=12)
-    return rng.randint(1, 25)
-
-
-def get_level5_suffix(username: str) -> str:
-    rng = get_user_rng(username, 5)
-    rng.choices(string.ascii_uppercase + string.digits, k=12)
-    return ''.join(rng.choices('0123456789abcdef', k=6))
-
-
-def caesar_encrypt(text: str, shift: int) -> str:
-    result = []
-    for ch in text:
-        if ch.isalpha():
-            base = ord('A') if ch.isupper() else ord('a')
-            result.append(chr((ord(ch) - base + shift) % 26 + base))
-        else:
-            result.append(ch)
-    return ''.join(result)
-
-
 # ---------------------------------------------------------------------------
 # DB helpers
 # ---------------------------------------------------------------------------
@@ -178,7 +156,7 @@ def login_required(f):
 
 
 # ---------------------------------------------------------------------------
-# Cookie helpers (Level 3)
+# Level 1 helpers: Cookie manipulation
 # ---------------------------------------------------------------------------
 
 def _make_access_cookie(username: str, role: str = 'guest') -> str:
@@ -196,12 +174,190 @@ def _parse_access_cookie(cookie_val: str) -> dict | None:
         return None
 
 
+# ---------------------------------------------------------------------------
+# Level 2 helpers: JS obfuscation
+# ---------------------------------------------------------------------------
+
+_XOR_KEY = "RICOMP"
+
+
+def _xor_encode_flag(flag: str) -> list[int]:
+    """XOR each character of the flag with repeating key."""
+    return [ord(c) ^ ord(_XOR_KEY[i % len(_XOR_KEY)]) for i, c in enumerate(flag)]
+
+
+def generate_obfuscated_js(username: str) -> str:
+    """Generate obfuscated JS containing the user's Level 2 flag."""
+    flag = generate_flag(username, 2)
+    xored = _xor_encode_flag(flag)
+    hex_str = ''.join(f'{b:02x}' for b in xored)
+
+    # Split hex string into 4-char chunks
+    chunks = [hex_str[i:i+4] for i in range(0, len(hex_str), 4)]
+    n = len(chunks)
+
+    # Create a scrambled order
+    rng = get_user_rng(username, 2)
+    rng.choices(string.ascii_uppercase + string.digits, k=12)  # consume flag RNG
+    order = list(range(n))
+    rng.shuffle(order)
+
+    # Build scrambled array: scrambled[order[i]] = chunks[i]
+    scrambled = [''] * n
+    for i, idx in enumerate(order):
+        scrambled[idx] = chunks[i]
+
+    # XOR key as char codes
+    key_codes = [ord(c) for c in _XOR_KEY]
+
+    js = f"""// RI-COMP Security Module v3.7.2
+// Integrity verification system - DO NOT MODIFY
+(function() {{
+    var _0x4f3a = "R0lGT1JNQVQ=";
+    var _0x9c2e = "aW50ZWdyaXR5";
+    var _0x1d7b = [{', '.join(f'"{c}"' for c in scrambled)}];
+    var _0x8a4f = [{', '.join(str(x) for x in order)}];
+    var _0xf1 = [{', '.join(str(c) for c in key_codes)}];
+    var _0x3377 = "session_valid";
+
+    function _0xa1(t) {{ return atob(t); }}
+    function _0xb2(a, b) {{ return a ^ b; }}
+
+    function _0xcc() {{
+        var _r = "";
+        for (var i = 0; i < _0x8a4f.length; i++) {{
+            _r += _0x1d7b[_0x8a4f[i]];
+        }}
+        return _r;
+    }}
+
+    function _0x7e(_hex) {{
+        var out = "";
+        for (var j = 0; j < _hex.length; j += 2) {{
+            out += String.fromCharCode(
+                _0xb2(parseInt(_hex.substr(j, 2), 16), _0xf1[(j / 2) % _0xf1.length])
+            );
+        }}
+        return out;
+    }}
+
+    function _0xe5() {{
+        try {{
+            var _p = _0xa1(_0x4f3a);
+            if (_p.indexOf("GIF") !== -1) return false;
+        }} catch(e) {{}}
+        return true;
+    }}
+
+    function _verify() {{
+        if (!_0xe5()) return _0x3377;
+        return _0x7e(_0xcc());
+    }}
+
+    // Module self-check
+    var _status = _0xe5();
+    console.log("%c[Security Module] " + (_status ? "Active" : "Error"), "color: #0f0; font-weight: bold;");
+
+    // Debug hook - remove before production
+    if (window.__RICOMP_DEBUG) {{
+        console.log(_verify());
+    }}
+}})();"""
+
+    return js
+
+
+# ---------------------------------------------------------------------------
+# Level 3 helpers: Caesar cipher
+# ---------------------------------------------------------------------------
+
+def get_caesar_shift(username: str) -> int:
+    rng = get_user_rng(username, 3)
+    rng.choices(string.ascii_uppercase + string.digits, k=12)  # consume flag RNG
+    return rng.randint(1, 25)
+
+
+def caesar_encrypt(text: str, shift: int) -> str:
+    result = []
+    for ch in text:
+        if ch.isalpha():
+            base = ord('A') if ch.isupper() else ord('a')
+            result.append(chr((ord(ch) - base + shift) % 26 + base))
+        else:
+            result.append(ch)
+    return ''.join(result)
+
+
+# ---------------------------------------------------------------------------
+# Level 4 helpers: JWT
+# ---------------------------------------------------------------------------
+
+def _b64url_encode(data: bytes) -> str:
+    """Base64url encode without padding."""
+    return base64.urlsafe_b64encode(data).rstrip(b'=').decode()
+
+
+def _b64url_decode(s: str) -> bytes:
+    """Base64url decode with padding restoration."""
+    padding = 4 - len(s) % 4
+    if padding != 4:
+        s += '=' * padding
+    return base64.urlsafe_b64decode(s)
+
+
+def get_jwt_secret(username: str) -> str:
+    """Per-user JWT secret for Level 4."""
+    rng = get_user_rng(username, 4)
+    rng.choices(string.ascii_uppercase + string.digits, k=12)  # consume flag RNG
+    return ''.join(rng.choices(string.ascii_lowercase + string.digits, k=24))
+
+
+def verify_jwt(token: str, secret: str) -> dict | None:
+    """Verify a HS256 JWT and return the payload, or None."""
+    parts = token.split('.')
+    if len(parts) != 3:
+        return None
+
+    header_b64, payload_b64, sig_b64 = parts
+
+    try:
+        header = _json.loads(_b64url_decode(header_b64))
+        if header.get('alg') != 'HS256':
+            return None
+    except Exception:
+        return None
+
+    signing_input = f'{header_b64}.{payload_b64}'.encode()
+    expected_sig = _hmac.new(secret.encode(), signing_input, hashlib.sha256).digest()
+    expected_sig_b64 = _b64url_encode(expected_sig)
+
+    if expected_sig_b64 != sig_b64:
+        return None
+
+    try:
+        payload = _json.loads(_b64url_decode(payload_b64))
+        return payload
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Level 5 helpers: Timing side-channel
+# ---------------------------------------------------------------------------
+
+TIMING_DELAY = 0.075  # 75ms per correct character
+
+
+# ---------------------------------------------------------------------------
+# Level info
+# ---------------------------------------------------------------------------
+
 LEVEL_INFO = [
-    {'num': 1, 'title': 'The Surface',          'difficulty': 'Easy'},
-    {'num': 2, 'title': 'Network Whisper',         'difficulty': 'Easy-Medium'},
-    {'num': 3, 'title': 'Privilege Escalation',   'difficulty': 'Medium'},
-    {'num': 4, 'title': 'Cipher',                 'difficulty': 'Medium'},
-    {'num': 5, 'title': 'Deep Recon',             'difficulty': 'Hard'},
+    {'num': 1, 'title': 'Privilege Escalation',  'difficulty': 'Easy-Medium'},
+    {'num': 2, 'title': 'Codebreaker',           'difficulty': 'Medium'},
+    {'num': 3, 'title': 'Cipher',                'difficulty': 'Medium'},
+    {'num': 4, 'title': 'Shadow Protocol',       'difficulty': 'Hard'},
+    {'num': 5, 'title': 'Phantom Signal',        'difficulty': 'Very Hard'},
 ]
 
 
@@ -218,16 +374,13 @@ def index():
         if not re.match(r'^[a-z0-9_]+$', username):
             return render_template('index.html', error='Only lowercase letters, digits, and underscores.')
 
-        # Check if username is taken by someone else (or create new)
         if user_exists(username):
-            # Username exists — let them log back in
             pass
         else:
             create_user(username)
 
         session['username'] = username
         resp = make_response(redirect(url_for('hub')))
-        # Clear leftover cookies from previous users
         resp.delete_cookie('access')
         resp.delete_cookie('role')
         return resp
@@ -253,38 +406,12 @@ def logout():
 
 
 # ---------------------------------------------------------------------------
-# Level 1: HTML source inspection
+# Level 1: Cookie manipulation
 # ---------------------------------------------------------------------------
 
 @app.route('/level/1')
 @login_required
 def level1():
-    flag = generate_flag(session['username'], 1)
-    return render_template('level1.html', flag=flag)
-
-
-# ---------------------------------------------------------------------------
-# Level 2: HTTP response header inspection
-# ---------------------------------------------------------------------------
-
-@app.route('/level/2')
-@login_required
-def level2():
-    username = session['username']
-    flag = generate_flag(username, 2)
-    resp = make_response(render_template('level2.html'))
-    resp.headers['X-CTF-Flag'] = flag
-    resp.headers['X-Server-Note'] = 'Nice catch, agent. Submit this flag.'
-    return resp
-
-
-# ---------------------------------------------------------------------------
-# Level 3: Encoded cookie manipulation
-# ---------------------------------------------------------------------------
-
-@app.route('/level/3')
-@login_required
-def level3():
     username = session['username']
     access_cookie = request.cookies.get('access', '')
     parsed = _parse_access_cookie(access_cookie) if access_cookie else None
@@ -293,11 +420,11 @@ def level3():
     if parsed and parsed.get('role') == 'admin':
         role = 'admin'
 
-    flag = generate_flag(username, 3) if role == 'admin' else None
+    flag = generate_flag(username, 1) if role == 'admin' else None
     cookie_display = access_cookie if access_cookie else '(not set)'
 
     resp = make_response(render_template(
-        'level3.html', role=role, flag=flag,
+        'level1.html', role=role, flag=flag,
         cookie_raw=cookie_display, cookie_decoded=parsed
     ))
     if not access_cookie:
@@ -306,21 +433,100 @@ def level3():
 
 
 # ---------------------------------------------------------------------------
-# Level 4: Caesar cipher
+# Level 2: JavaScript obfuscation
+# ---------------------------------------------------------------------------
+
+@app.route('/level/2')
+@login_required
+def level2():
+    username = session['username']
+    obfuscated_js = generate_obfuscated_js(username)
+    return render_template('level2.html', obfuscated_js=obfuscated_js)
+
+
+# ---------------------------------------------------------------------------
+# Level 3: Caesar cipher
+# ---------------------------------------------------------------------------
+
+@app.route('/level/3')
+@login_required
+def level3():
+    username = session['username']
+    flag = generate_flag(username, 3)
+    shift = get_caesar_shift(username)
+    encrypted = caesar_encrypt(flag, shift)
+    return render_template('level3.html', encrypted=encrypted)
+
+
+# ---------------------------------------------------------------------------
+# Level 4: Multi-step chain (robots.txt -> debug config -> JWT forge -> vault)
 # ---------------------------------------------------------------------------
 
 @app.route('/level/4')
 @login_required
 def level4():
+    return render_template('level4.html')
+
+
+@app.route('/robots.txt')
+def robots_txt():
+    content = """User-agent: *
+Disallow: /debug/config
+# NOTE: debug endpoints must not be indexed
+"""
+    return content, 200, {'Content-Type': 'text/plain'}
+
+
+@app.route('/debug/config')
+@login_required
+def debug_config():
     username = session['username']
+    secret = get_jwt_secret(username)
+    return jsonify({
+        'status': 'debug_active',
+        'jwt_secret': secret,
+        'jwt_algorithm': 'HS256',
+        'note': 'Use this secret to sign a JWT. The vault requires role=admin in the payload.',
+        'vault': '/api/vault',
+        'jwt_format': 'Header: {"alg":"HS256","typ":"JWT"} | Payload must include: {"sub":"<username>","role":"admin"}'
+    })
+
+
+@app.route('/api/vault')
+@login_required
+def api_vault():
+    username = session['username']
+    auth_header = request.headers.get('Authorization', '')
+
+    if not auth_header.startswith('Bearer '):
+        return jsonify({
+            'error': 'Authorization required',
+            'hint': 'Send a Bearer token in the Authorization header'
+        }), 401
+
+    token = auth_header[7:]
+    secret = get_jwt_secret(username)
+    payload = verify_jwt(token, secret)
+
+    if payload is None:
+        return jsonify({'error': 'Invalid or tampered token'}), 403
+
+    if payload.get('role') != 'admin':
+        return jsonify({'error': 'Insufficient privileges. Admin role required.'}), 403
+
+    if payload.get('sub') != username:
+        return jsonify({'error': 'Token subject does not match session user.'}), 403
+
     flag = generate_flag(username, 4)
-    shift = get_level4_shift(username)
-    encrypted = caesar_encrypt(flag, shift)
-    return render_template('level4.html', encrypted=encrypted)
+    return jsonify({
+        'status': 'access_granted',
+        'flag': flag,
+        'message': 'Well done, agent. You cracked the Shadow Protocol.'
+    })
 
 
 # ---------------------------------------------------------------------------
-# Level 5: Hidden API endpoint
+# Level 5: Timing side-channel
 # ---------------------------------------------------------------------------
 
 @app.route('/level/5')
@@ -329,41 +535,24 @@ def level5():
     return render_template('level5.html')
 
 
-@app.route('/api/data')
-def api_data():
-    return jsonify({
-        'status': 'ok',
-        'system': 'RI-COMP CTF Data Service',
-        'endpoints': ['/api/data', '/api/health'],
-        'hint': 'Not all endpoints are listed here. Some are secret.',
-        'debug': 'Authenticated users can retrieve their token at /api/token'
-    })
-
-
-@app.route('/api/health')
-def api_health():
-    return jsonify({'status': 'healthy', 'uptime': int(time.time())})
-
-
-@app.route('/api/token')
+@app.route('/level/5/signal', methods=['POST'])
 @login_required
-def api_token():
-    suffix = get_level5_suffix(session['username'])
-    return jsonify({
-        'token': suffix,
-        'usage': 'Append this token to the secret endpoint path'
-    })
-
-
-@app.route('/api/secret_<suffix>')
-@login_required
-def api_secret(suffix):
+def level5_signal():
+    """Verification endpoint with intentional timing side-channel."""
     username = session['username']
-    expected = get_level5_suffix(username)
-    if suffix == expected:
-        flag = generate_flag(username, 5)
-        return jsonify({'flag': flag, 'message': 'Well done, agent.'})
-    return jsonify({'error': 'Unknown endpoint'}), 404
+    flag = generate_flag(username, 5)
+    guess = request.form.get('code', request.json.get('code', '') if request.is_json else '')
+
+    # Intentional vulnerability: timing leak
+    # Each correct character adds a delay before rejection
+    matched = 0
+    for i in range(min(len(guess), len(flag))):
+        if guess[i] != flag[i]:
+            break
+        matched += 1
+        time.sleep(TIMING_DELAY)
+
+    return jsonify({'status': 'invalid', 'ts': int(time.time() * 1000)})
 
 
 # ---------------------------------------------------------------------------
