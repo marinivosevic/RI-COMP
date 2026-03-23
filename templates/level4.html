@@ -1,34 +1,34 @@
 {% extends "base.html" %}
 {% block title %}CTF // Level 4{% endblock %}
 {% block content %}
-<!-- v5.1.0 build 2026-03-14 -->
-<h1>Level 4: Shadow Protocol</h1>
+<h1>Level 4: Cipher</h1>
 <div class="card">
     <h2>Briefing</h2>
-    <p>An ultra-classified vault contains your flag. But there is no direct link to it — no button, no form.</p>
-    <p>You'll need to think like a real penetration tester: <strong>recon, discover, forge, and exploit</strong>.</p>
-    <p>This is a multi-step challenge. Nothing is handed to you.</p>
+    <p>We intercepted an encrypted transmission. Intelligence suggests it uses a classical substitution cipher popularized by a famous Roman general.</p>
+    <p>Decrypt the message to reveal the flag.</p>
 </div>
 
 <div class="card">
-    <h3>Mission Terminal</h3>
-    <div style="margin: 1rem 0; padding: 0.8rem; background: #0d0d0d; border: 1px solid #333; border-radius: 3px;">
-        <p style="color: var(--green); font-size: 0.85rem;">
-            &gt; Connected to RI-COMP Secure Network<br>
-            &gt; Clearance: STANDARD<br>
-            &gt; Vault status: <span style="color: var(--red);">LOCKED</span><br>
-            &gt; Required: Valid admin authentication token
-        </p>
+    <h3>Intercepted Transmission</h3>
+    <div class="cipher-text">{{ encrypted }}</div>
+
+    <div class="hint" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'">
+        [+] Hint 1 (click to reveal)
+    </div>
+    <div class="hint-content">
+        The cipher is named after Julius Caesar. Each letter is shifted by a fixed number of positions in the alphabet.
+    </div>
+
+    <div class="hint" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'block' ? 'none' : 'block'" style="margin-top: 0.5rem;">
+        [+] Hint 2 (click to reveal)
+    </div>
+    <div class="hint-content">
+        You know the flag format starts with <code style="color: var(--green);">FLAG{</code>. Compare the first letter of the ciphertext with 'F' to determine the shift.
     </div>
 </div>
 
 <div class="card">
-    <h3>Field Note</h3>
-    <p style="color: #555; font-size: 0.85rem; font-style: italic;">"A good pentester always starts with recon. Sometimes the things a site tries to hide from crawlers are exactly the things worth finding."</p>
-</div>
-
-<div class="card">
-    <h3>Submit Flag</h3>
+    <h3>Submit Decrypted Flag</h3>
     <form class="flag-form" method="POST" action="/submit">
         <input type="hidden" name="level" value="4">
         <input type="text" name="flag" placeholder="FLAG{...}" required>

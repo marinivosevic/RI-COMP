@@ -1,6 +1,6 @@
 """
 RI-COMP CTF Challenge Server
-A self-contained CTF web app with 5 levels and per-user flag randomization.
+A self-contained CTF web app with 6 levels and per-user flag randomization.
 Run: pip install flask psycopg2-binary && python server.py
 Requires: PostgreSQL on localhost:5433 (docker container ri-comp-postgres)
 """
@@ -12,6 +12,7 @@ import base64
 import json as _json
 import time
 import re
+import os
 import hmac as _hmac
 from functools import wraps
 from contextlib import contextmanager
@@ -24,12 +25,15 @@ from flask import (
 )
 
 app = Flask(__name__)
-app.secret_key = 'ri-comp-ctf-2026-s3cr3t-key'
+app.secret_key = os.environ.get('SECRET_KEY', 'ri-comp-ctf-2026-s3cr3t-key')
 
 # ---------------------------------------------------------------------------
 # Database
 # ---------------------------------------------------------------------------
 
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+# Local fallback config (docker-compose setup)
 DB_CONFIG = {
     'host': 'localhost',
     'port': 5433,
@@ -42,7 +46,10 @@ DB_CONFIG = {
 @contextmanager
 def get_db():
     """Yield a (connection, cursor) pair, auto-commit on success."""
-    conn = psycopg2.connect(**DB_CONFIG)
+    if DATABASE_URL:
+        conn = psycopg2.connect(DATABASE_URL)
+    else:
+        conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     try:
         yield conn, cur
@@ -156,7 +163,7 @@ def login_required(f):
 
 
 # ---------------------------------------------------------------------------
-# Level 1 helpers: Cookie manipulation
+# Level 2 helpers: Cookie manipulation
 # ---------------------------------------------------------------------------
 
 def _make_access_cookie(username: str, role: str = 'guest') -> str:
@@ -175,7 +182,7 @@ def _parse_access_cookie(cookie_val: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
-# Level 2 helpers: JS obfuscation
+# Level 3 helpers: JS obfuscation
 # ---------------------------------------------------------------------------
 
 _XOR_KEY = "RICOMP"
@@ -187,8 +194,8 @@ def _xor_encode_flag(flag: str) -> list[int]:
 
 
 def generate_obfuscated_js(username: str) -> str:
-    """Generate obfuscated JS containing the user's Level 2 flag."""
-    flag = generate_flag(username, 2)
+    """Generate obfuscated JS containing the user's Level 3 flag."""
+    flag = generate_flag(username, 3)
     xored = _xor_encode_flag(flag)
     hex_str = ''.join(f'{b:02x}' for b in xored)
 
@@ -197,7 +204,7 @@ def generate_obfuscated_js(username: str) -> str:
     n = len(chunks)
 
     # Create a scrambled order
-    rng = get_user_rng(username, 2)
+    rng = get_user_rng(username, 3)
     rng.choices(string.ascii_uppercase + string.digits, k=12)  # consume flag RNG
     order = list(range(n))
     rng.shuffle(order)
@@ -268,11 +275,11 @@ def generate_obfuscated_js(username: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Level 3 helpers: Caesar cipher
+# Level 4 helpers: Caesar cipher
 # ---------------------------------------------------------------------------
 
 def get_caesar_shift(username: str) -> int:
-    rng = get_user_rng(username, 3)
+    rng = get_user_rng(username, 4)
     rng.choices(string.ascii_uppercase + string.digits, k=12)  # consume flag RNG
     return rng.randint(1, 25)
 
@@ -289,7 +296,7 @@ def caesar_encrypt(text: str, shift: int) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Level 4 helpers: JWT
+# Level 5 helpers: JWT
 # ---------------------------------------------------------------------------
 
 def _b64url_encode(data: bytes) -> str:
@@ -306,8 +313,8 @@ def _b64url_decode(s: str) -> bytes:
 
 
 def get_jwt_secret(username: str) -> str:
-    """Per-user JWT secret for Level 4."""
-    rng = get_user_rng(username, 4)
+    """Per-user JWT secret for Level 5."""
+    rng = get_user_rng(username, 5)
     rng.choices(string.ascii_uppercase + string.digits, k=12)  # consume flag RNG
     return ''.join(rng.choices(string.ascii_lowercase + string.digits, k=24))
 
@@ -342,7 +349,7 @@ def verify_jwt(token: str, secret: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
-# Level 5 helpers: Timing side-channel
+# Level 6 helpers: Timing side-channel
 # ---------------------------------------------------------------------------
 
 TIMING_DELAY = 0.075  # 75ms per correct character
@@ -353,11 +360,12 @@ TIMING_DELAY = 0.075  # 75ms per correct character
 # ---------------------------------------------------------------------------
 
 LEVEL_INFO = [
-    {'num': 1, 'title': 'Privilege Escalation',  'difficulty': 'Easy-Medium'},
-    {'num': 2, 'title': 'Codebreaker',           'difficulty': 'Medium'},
-    {'num': 3, 'title': 'Cipher',                'difficulty': 'Medium'},
-    {'num': 4, 'title': 'Shadow Protocol',       'difficulty': 'Hard'},
-    {'num': 5, 'title': 'Phantom Signal',        'difficulty': 'Very Hard'},
+    {'num': 1, 'title': 'Hidden in Plain Sight', 'difficulty': 'Easy'},
+    {'num': 2, 'title': 'Privilege Escalation',  'difficulty': 'Easy-Medium'},
+    {'num': 3, 'title': 'Codebreaker',           'difficulty': 'Medium'},
+    {'num': 4, 'title': 'Cipher',                'difficulty': 'Medium'},
+    {'num': 5, 'title': 'Shadow Protocol',       'difficulty': 'Hard'},
+    {'num': 6, 'title': 'Phantom Signal',        'difficulty': 'Very Hard'},
 ]
 
 
@@ -395,7 +403,7 @@ def hub():
     levels = []
     for info in LEVEL_INFO:
         levels.append({**info, 'solved': info['num'] in user_solves})
-    all_solved = len(user_solves) == 5
+    all_solved = len(user_solves) == 6
     return render_template('hub.html', levels=levels, all_solved=all_solved)
 
 
@@ -406,12 +414,24 @@ def logout():
 
 
 # ---------------------------------------------------------------------------
-# Level 1: Cookie manipulation
+# Level 1: Hidden in Plain Sight (flag in HTML source)
 # ---------------------------------------------------------------------------
 
 @app.route('/level/1')
 @login_required
 def level1():
+    username = session['username']
+    flag = generate_flag(username, 1)
+    return render_template('level1.html', flag=flag)
+
+
+# ---------------------------------------------------------------------------
+# Level 2: Cookie manipulation
+# ---------------------------------------------------------------------------
+
+@app.route('/level/2')
+@login_required
+def level2():
     username = session['username']
     access_cookie = request.cookies.get('access', '')
     parsed = _parse_access_cookie(access_cookie) if access_cookie else None
@@ -420,11 +440,11 @@ def level1():
     if parsed and parsed.get('role') == 'admin':
         role = 'admin'
 
-    flag = generate_flag(username, 1) if role == 'admin' else None
+    flag = generate_flag(username, 2) if role == 'admin' else None
     cookie_display = access_cookie if access_cookie else '(not set)'
 
     resp = make_response(render_template(
-        'level1.html', role=role, flag=flag,
+        'level2.html', role=role, flag=flag,
         cookie_raw=cookie_display, cookie_decoded=parsed
     ))
     if not access_cookie:
@@ -433,39 +453,39 @@ def level1():
 
 
 # ---------------------------------------------------------------------------
-# Level 2: JavaScript obfuscation
-# ---------------------------------------------------------------------------
-
-@app.route('/level/2')
-@login_required
-def level2():
-    username = session['username']
-    obfuscated_js = generate_obfuscated_js(username)
-    return render_template('level2.html', obfuscated_js=obfuscated_js)
-
-
-# ---------------------------------------------------------------------------
-# Level 3: Caesar cipher
+# Level 3: JavaScript obfuscation
 # ---------------------------------------------------------------------------
 
 @app.route('/level/3')
 @login_required
 def level3():
     username = session['username']
-    flag = generate_flag(username, 3)
-    shift = get_caesar_shift(username)
-    encrypted = caesar_encrypt(flag, shift)
-    return render_template('level3.html', encrypted=encrypted)
+    obfuscated_js = generate_obfuscated_js(username)
+    return render_template('level3.html', obfuscated_js=obfuscated_js)
 
 
 # ---------------------------------------------------------------------------
-# Level 4: Multi-step chain (robots.txt -> debug config -> JWT forge -> vault)
+# Level 4: Caesar cipher
 # ---------------------------------------------------------------------------
 
 @app.route('/level/4')
 @login_required
 def level4():
-    return render_template('level4.html')
+    username = session['username']
+    flag = generate_flag(username, 4)
+    shift = get_caesar_shift(username)
+    encrypted = caesar_encrypt(flag, shift)
+    return render_template('level4.html', encrypted=encrypted)
+
+
+# ---------------------------------------------------------------------------
+# Level 5: Multi-step chain (robots.txt -> debug config -> JWT forge -> vault)
+# ---------------------------------------------------------------------------
+
+@app.route('/level/5')
+@login_required
+def level5():
+    return render_template('level5.html')
 
 
 @app.route('/robots.txt')
@@ -517,7 +537,7 @@ def api_vault():
     if payload.get('sub') != username:
         return jsonify({'error': 'Token subject does not match session user.'}), 403
 
-    flag = generate_flag(username, 4)
+    flag = generate_flag(username, 5)
     return jsonify({
         'status': 'access_granted',
         'flag': flag,
@@ -526,21 +546,21 @@ def api_vault():
 
 
 # ---------------------------------------------------------------------------
-# Level 5: Timing side-channel
+# Level 6: Timing side-channel
 # ---------------------------------------------------------------------------
 
-@app.route('/level/5')
+@app.route('/level/6')
 @login_required
-def level5():
-    return render_template('level5.html')
+def level6():
+    return render_template('level6.html')
 
 
-@app.route('/level/5/signal', methods=['POST'])
+@app.route('/level/6/signal', methods=['POST'])
 @login_required
-def level5_signal():
+def level6_signal():
     """Verification endpoint with intentional timing side-channel."""
     username = session['username']
-    flag = generate_flag(username, 5)
+    flag = generate_flag(username, 6)
     guess = request.form.get('code', request.json.get('code', '') if request.is_json else '')
 
     # Intentional vulnerability: timing leak
@@ -597,9 +617,12 @@ def scoreboard_view():
 # Run
 # ---------------------------------------------------------------------------
 
+# Always init DB tables on import (needed for gunicorn in production)
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     print('\n  RI-COMP CTF Server')
     print('  http://localhost:5000')
     print('  Database: PostgreSQL on localhost:5433\n')
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
