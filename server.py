@@ -31,7 +31,25 @@ app.secret_key = os.environ.get('SECRET_KEY', 'ri-comp-ctf-2026-s3cr3t-key')
 # Database
 # ---------------------------------------------------------------------------
 
-DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
+def _clean_dsn(url: str | None) -> str | None:
+    """Strip query params that psycopg2 doesn't understand (e.g. Supabase's 'supa' param)."""
+    if not url:
+        return None
+    from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+    parsed = urlparse(url)
+    # Keep only params psycopg2 recognises
+    PG_PARAMS = {
+        'sslmode', 'sslcert', 'sslkey', 'sslrootcert', 'sslcrl',
+        'connect_timeout', 'client_encoding', 'options', 'application_name',
+        'keepalives', 'keepalives_idle', 'keepalives_interval', 'keepalives_count',
+        'target_session_attrs',
+    }
+    qs = parse_qs(parsed.query)
+    clean_qs = {k: v for k, v in qs.items() if k in PG_PARAMS}
+    cleaned = parsed._replace(query=urlencode(clean_qs, doseq=True))
+    return urlunparse(cleaned)
+
+DATABASE_URL = _clean_dsn(os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL'))
 
 # Local fallback config (docker-compose setup)
 DB_CONFIG = {
