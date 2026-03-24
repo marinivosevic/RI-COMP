@@ -31,7 +31,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'ri-comp-ctf-2026-s3cr3t-key')
 # Database
 # ---------------------------------------------------------------------------
 
-DATABASE_URL = os.environ.get('DATABASE_URL')
+DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
 
 # Local fallback config (docker-compose setup)
 DB_CONFIG = {
