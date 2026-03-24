@@ -19,6 +19,41 @@
     <main>
         {% block content %}{% endblock %}
     </main>
+    {% if timer_elapsed is defined and timer_elapsed is not none %}
+    <div id="level-timer" style="position: fixed; top: 52px; right: 1.5rem; background: #0d0d1a; border: 1px solid var(--green); padding: 0.4rem 0.8rem; border-radius: 3px; font-size: 0.85rem; color: var(--green); z-index: 9998; font-family: var(--font);">
+        &#9201; <span id="timer-display">00:00</span>
+    </div>
+    <script>
+    (function() {
+        var elapsedAtLoad = {{ timer_elapsed }};
+        var done = {{ 'true' if timer_done else 'false' }};
+        var loadTime = Date.now() / 1000;
+        var display = document.getElementById('timer-display');
+        function pad(n) { return n < 10 ? '0' + n : '' + n; }
+        function update() {
+            var sinceLoad = Date.now() / 1000 - loadTime;
+            var elapsed = Math.floor(elapsedAtLoad + sinceLoad);
+            if (elapsed < 0) elapsed = 0;
+            var h = Math.floor(elapsed / 3600);
+            var m = Math.floor((elapsed % 3600) / 60);
+            var s = elapsed % 60;
+            if (h > 0) {
+                display.textContent = h + ':' + pad(m) + ':' + pad(s);
+            } else {
+                display.textContent = pad(m) + ':' + pad(s);
+            }
+        }
+        if (done) {
+            document.getElementById('level-timer').style.borderColor = '#555';
+            document.getElementById('level-timer').style.color = '#555';
+            display.textContent = 'DONE';
+        } else {
+            update();
+            setInterval(update, 1000);
+        }
+    })();
+    </script>
+    {% endif %}
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -99,6 +99,24 @@ def init_db():
                 UNIQUE(username, level)
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS level_timers (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(20) NOT NULL REFERENCES users(username),
+                level INTEGER NOT NULL,
+                started_at TIMESTAMP NOT NULL DEFAULT NOW(),
+                finished_at TIMESTAMP,
+                elapsed_seconds FLOAT,
+                UNIQUE(username, level)
+            )
+        """)
+        # Add consent column if missing (safe to re-run)
+        cur.execute("""
+            DO $$ BEGIN
+                ALTER TABLE users ADD COLUMN consent BOOLEAN DEFAULT FALSE;
+            EXCEPTION WHEN duplicate_column THEN NULL;
+            END $$;
+        """)
 
 
 # ---------------------------------------------------------------------------
@@ -151,13 +169,57 @@ def record_solve(username: str, level: int):
         )
 
 
+def start_timer(username: str, level: int):
+    """Record when a user first opens a level. No-op if already started."""
+    with get_db() as (conn, cur):
+        cur.execute(
+            """INSERT INTO level_timers (username, level, started_at)
+               VALUES (%s, %s, NOW())
+               ON CONFLICT (username, level) DO NOTHING""",
+            (username, level)
+        )
+
+
+def stop_timer(username: str, level: int):
+    """Stop the timer for a level and record elapsed seconds."""
+    with get_db() as (conn, cur):
+        cur.execute(
+            """UPDATE level_timers
+               SET finished_at = NOW(),
+                   elapsed_seconds = EXTRACT(EPOCH FROM (NOW() - started_at))
+               WHERE username = %s AND level = %s AND finished_at IS NULL""",
+            (username, level)
+        )
+
+
+def get_timer_info(username: str, level: int):
+    """Return (elapsed_seconds, is_finished) for a level timer."""
+    with get_db() as (conn, cur):
+        cur.execute(
+            """SELECT started_at, finished_at, elapsed_seconds,
+                      EXTRACT(EPOCH FROM (NOW() - started_at)) AS running_seconds
+               FROM level_timers WHERE username = %s AND level = %s""",
+            (username, level)
+        )
+        row = cur.fetchone()
+        if not row:
+            return None, False
+        if row['finished_at'] is not None:
+            return row['elapsed_seconds'], True
+        return row['running_seconds'], False
+
+
 def get_scoreboard():
     with get_db() as (conn, cur):
         cur.execute("""
             SELECT u.username,
                    ARRAY_AGG(s.level ORDER BY s.level) AS solved,
                    COUNT(s.level) AS count,
-                   MAX(s.solved_at) AS last_time
+                   MAX(s.solved_at) AS last_time,
+                   COALESCE((SELECT SUM(lt.elapsed_seconds)
+                             FROM level_timers lt
+                             WHERE lt.username = u.username
+                               AND lt.finished_at IS NOT NULL), 0) AS total_seconds
             FROM users u
             LEFT JOIN solves s ON u.username = s.username
             GROUP BY u.username
@@ -400,9 +462,13 @@ def index():
         if not re.match(r'^[a-z0-9_]+$', username):
             return render_template('index.html', error='Only lowercase letters, digits, and underscores.')
 
-        if user_exists(username):
-            pass
-        else:
+        existing = user_exists(username)
+        if not existing:
+            consent = request.form.get('consent')
+            if not consent:
+                return render_template('index.html',
+                                       error='You must consent to data processing to participate.',
+                                       username_val=username)
             create_user(username)
 
         session['username'] = username
@@ -439,8 +505,12 @@ def logout():
 @login_required
 def level1():
     username = session['username']
+    start_timer(username, 1)
+    timer_elapsed, timer_done = get_timer_info(username, 1)
     flag = generate_flag(username, 1)
-    return render_template('level1.html', flag=flag)
+    return render_template('level1.html', flag=flag,
+                           timer_elapsed=timer_elapsed,
+                           timer_done=timer_done)
 
 
 # ---------------------------------------------------------------------------
@@ -451,6 +521,8 @@ def level1():
 @login_required
 def level2():
     username = session['username']
+    start_timer(username, 2)
+    timer_elapsed, timer_done = get_timer_info(username, 2)
     access_cookie = request.cookies.get('access', '')
     parsed = _parse_access_cookie(access_cookie) if access_cookie else None
 
@@ -463,7 +535,9 @@ def level2():
 
     resp = make_response(render_template(
         'level2.html', role=role, flag=flag,
-        cookie_raw=cookie_display, cookie_decoded=parsed
+        cookie_raw=cookie_display, cookie_decoded=parsed,
+        timer_elapsed=timer_elapsed,
+        timer_done=timer_done
     ))
     if not access_cookie:
         resp.set_cookie('access', _make_access_cookie(username, 'guest'))
@@ -478,8 +552,12 @@ def level2():
 @login_required
 def level3():
     username = session['username']
+    start_timer(username, 3)
+    timer_elapsed, timer_done = get_timer_info(username, 3)
     obfuscated_js = generate_obfuscated_js(username)
-    return render_template('level3.html', obfuscated_js=obfuscated_js)
+    return render_template('level3.html', obfuscated_js=obfuscated_js,
+                           timer_elapsed=timer_elapsed,
+                           timer_done=timer_done)
 
 
 # ---------------------------------------------------------------------------
@@ -490,10 +568,14 @@ def level3():
 @login_required
 def level4():
     username = session['username']
+    start_timer(username, 4)
+    timer_elapsed, timer_done = get_timer_info(username, 4)
     flag = generate_flag(username, 4)
     shift = get_caesar_shift(username)
     encrypted = caesar_encrypt(flag, shift)
-    return render_template('level4.html', encrypted=encrypted)
+    return render_template('level4.html', encrypted=encrypted,
+                           timer_elapsed=timer_elapsed,
+                           timer_done=timer_done)
 
 
 # ---------------------------------------------------------------------------
@@ -503,7 +585,12 @@ def level4():
 @app.route('/level/5')
 @login_required
 def level5():
-    return render_template('level5.html')
+    username = session['username']
+    start_timer(username, 5)
+    timer_elapsed, timer_done = get_timer_info(username, 5)
+    return render_template('level5.html',
+                           timer_elapsed=timer_elapsed,
+                           timer_done=timer_done)
 
 
 @app.route('/robots.txt')
@@ -570,7 +657,12 @@ def api_vault():
 @app.route('/level/6')
 @login_required
 def level6():
-    return render_template('level6.html')
+    username = session['username']
+    start_timer(username, 6)
+    timer_elapsed, timer_done = get_timer_info(username, 6)
+    return render_template('level6.html',
+                           timer_elapsed=timer_elapsed,
+                           timer_done=timer_done)
 
 
 @app.route('/level/6/signal', methods=['POST'])
@@ -611,6 +703,7 @@ def submit_flag():
     correct = submitted == expected
 
     if correct:
+        stop_timer(username, level)
         record_solve(username, level)
 
     return render_template('success.html', level=level, correct=correct)
@@ -622,11 +715,23 @@ def scoreboard_view():
     board = []
     for row in rows:
         solved = row['solved'] if row['solved'] and row['solved'][0] is not None else []
+        total_sec = row['total_seconds'] or 0
+        hours = int(total_sec // 3600)
+        minutes = int((total_sec % 3600) // 60)
+        seconds = int(total_sec % 60)
+        if hours > 0:
+            time_str = f'{hours}h {minutes:02d}m {seconds:02d}s'
+        elif minutes > 0:
+            time_str = f'{minutes}m {seconds:02d}s'
+        else:
+            time_str = f'{seconds}s'
         board.append({
             'username': row['username'],
             'solved': solved,
             'count': row['count'],
-            'last_time': row['last_time'].timestamp() if row['last_time'] else 0
+            'last_time': row['last_time'].timestamp() if row['last_time'] else 0,
+            'total_time': time_str,
+            'total_seconds': total_sec
         })
     return render_template('scoreboard.html', board=board)
 

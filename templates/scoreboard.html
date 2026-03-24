@@ -17,6 +17,7 @@
             <th>Lvl 5</th>
             <th>Lvl 6</th>
             <th>Score</th>
+            <th>Total Time</th>
         </tr>
     </thead>
     <tbody>
@@ -28,6 +29,7 @@
             <td><span class="dot {{ 'on' if i in entry.solved else 'off' }}"></span></td>
             {% endfor %}
             <td>{{ entry.count }}/6</td>
+            <td style="color: var(--silver); font-size: 0.85rem;">{{ entry.total_time }}</td>
         </tr>
         {% endfor %}
     </tbody>
