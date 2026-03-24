@@ -47,7 +47,7 @@ DB_CONFIG = {
 def get_db():
     """Yield a (connection, cursor) pair, auto-commit on success."""
     if DATABASE_URL:
-        conn = psycopg2.connect(DATABASE_URL)
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
     else:
         conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -617,8 +617,11 @@ def scoreboard_view():
 # Run
 # ---------------------------------------------------------------------------
 
-# Always init DB tables on import (needed for gunicorn in production)
-init_db()
+# Always init DB tables on import (needed for gunicorn/vercel in production)
+try:
+    init_db()
+except Exception as e:
+    print(f'Warning: Could not init DB on startup: {e}')
 
 if __name__ == '__main__':
     print('\n  RI-COMP CTF Server')
