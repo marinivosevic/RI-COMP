@@ -1,24 +1,58 @@
-{% extends "base.html" %}
-{% block title %}CTF // Login{% endblock %}
-{% block content %}
+{% extends "base.html" %} {% block title %}CTF // Login{% endblock %} {% block
+content %}
 <div class="landing">
-    <h1 class="cursor">RI-COMP CTF</h1>
-    <p>Enter your handle to begin. 6 levels. Find the flags.</p>
-    {% if error %}
-    <div class="msg error">{{ error }}</div>
-    {% endif %}
-    <form method="POST" action="/" id="login-form">
-        <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
-            <div style="display: flex; gap: 0.5rem;">
-                <input type="text" name="username" placeholder="your_handle" maxlength="20" autofocus required
-                       value="{{ username_val or '' }}">
-                <button type="submit">ENTER</button>
-            </div>
-            <label class="consent-label" style="display: flex; align-items: flex-start; gap: 0.5rem; max-width: 450px; text-align: left; font-size: 0.8rem; color: var(--silver); cursor: pointer;">
-                <input type="checkbox" name="consent" value="1" style="margin-top: 3px; accent-color: var(--green);">
-                <span>I consent to the processing of my data (username, solve times, and activity) for the purpose of this CTF competition. Data is used solely for the scoreboard and will not be shared with third parties.</span>
-            </label>
-        </div>
-    </form>
+  <h1 class="cursor">RI-COMP CTF</h1>
+  <p>Enter your handle to begin. 6 levels. Find the flags.</p>
+  {% if error %}
+  <div class="msg error">{{ error }}</div>
+  {% endif %}
+  <form method="POST" action="/" id="login-form">
+    <div
+      style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+      "
+    >
+      <div style="display: flex; gap: 0.5rem">
+        <input
+          type="text"
+          name="username"
+          placeholder="your_name"
+          maxlength="20"
+          autofocus
+          required
+          value="{{ username_val or '' }}"
+        />
+        <button type="submit">ENTER</button>
+      </div>
+      <label
+        class="consent-label"
+        style="
+          display: flex;
+          align-items: flex-start;
+          gap: 0.5rem;
+          max-width: 450px;
+          text-align: left;
+          font-size: 0.8rem;
+          color: var(--silver);
+          cursor: pointer;
+        "
+      >
+        <input
+          type="checkbox"
+          name="consent"
+          value="1"
+          style="margin-top: 3px; accent-color: var(--green)"
+        />
+        <span
+          >I consent to the processing of my data (username, solve times, and
+          activity) for the purpose of this CTF competition. Data is used solely
+          for the scoreboard and will not be shared with third parties.</span
+        >
+      </label>
+    </div>
+  </form>
 </div>
 {% endblock %}

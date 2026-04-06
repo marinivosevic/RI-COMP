@@ -262,7 +262,7 @@ def _parse_access_cookie(cookie_val: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
-# Level 3 helpers: JS obfuscation
+# Level 4 helpers: JS obfuscation
 # ---------------------------------------------------------------------------
 
 _XOR_KEY = "RICOMP"
@@ -274,8 +274,8 @@ def _xor_encode_flag(flag: str) -> list[int]:
 
 
 def generate_obfuscated_js(username: str) -> str:
-    """Generate obfuscated JS containing the user's Level 3 flag."""
-    flag = generate_flag(username, 3)
+    """Generate obfuscated JS containing the user's Level 4 flag."""
+    flag = generate_flag(username, 4)
     xored = _xor_encode_flag(flag)
     hex_str = ''.join(f'{b:02x}' for b in xored)
 
@@ -284,7 +284,7 @@ def generate_obfuscated_js(username: str) -> str:
     n = len(chunks)
 
     # Create a scrambled order
-    rng = get_user_rng(username, 3)
+    rng = get_user_rng(username, 4)
     rng.choices(string.ascii_uppercase + string.digits, k=12)  # consume flag RNG
     order = list(range(n))
     rng.shuffle(order)
@@ -355,11 +355,11 @@ def generate_obfuscated_js(username: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Level 4 helpers: Caesar cipher
+# Level 3 helpers: Caesar cipher
 # ---------------------------------------------------------------------------
 
 def get_caesar_shift(username: str) -> int:
-    rng = get_user_rng(username, 4)
+    rng = get_user_rng(username, 3)
     rng.choices(string.ascii_uppercase + string.digits, k=12)  # consume flag RNG
     return rng.randint(1, 25)
 
@@ -442,8 +442,8 @@ TIMING_DELAY = 0.075  # 75ms per correct character
 LEVEL_INFO = [
     {'num': 1, 'title': 'Hidden in Plain Sight', 'difficulty': 'Easy'},
     {'num': 2, 'title': 'Privilege Escalation',  'difficulty': 'Easy-Medium'},
-    {'num': 3, 'title': 'Codebreaker',           'difficulty': 'Medium'},
-    {'num': 4, 'title': 'Cipher',                'difficulty': 'Medium'},
+    {'num': 3, 'title': 'Cipher',                'difficulty': 'Medium'},
+    {'num': 4, 'title': 'Codebreaker',           'difficulty': 'Medium'},
     {'num': 5, 'title': 'Shadow Protocol',       'difficulty': 'Hard'},
     {'num': 6, 'title': 'Phantom Signal',        'difficulty': 'Very Hard'},
 ]
@@ -545,7 +545,7 @@ def level2():
 
 
 # ---------------------------------------------------------------------------
-# Level 3: JavaScript obfuscation
+# Level 3: Caesar cipher
 # ---------------------------------------------------------------------------
 
 @app.route('/level/3')
@@ -554,14 +554,16 @@ def level3():
     username = session['username']
     start_timer(username, 3)
     timer_elapsed, timer_done = get_timer_info(username, 3)
-    obfuscated_js = generate_obfuscated_js(username)
-    return render_template('level3.html', obfuscated_js=obfuscated_js,
+    flag = generate_flag(username, 3)
+    shift = get_caesar_shift(username)
+    encrypted = caesar_encrypt(flag, shift)
+    return render_template('level3.html', encrypted=encrypted,
                            timer_elapsed=timer_elapsed,
                            timer_done=timer_done)
 
 
 # ---------------------------------------------------------------------------
-# Level 4: Caesar cipher
+# Level 4: JavaScript obfuscation
 # ---------------------------------------------------------------------------
 
 @app.route('/level/4')
@@ -570,10 +572,8 @@ def level4():
     username = session['username']
     start_timer(username, 4)
     timer_elapsed, timer_done = get_timer_info(username, 4)
-    flag = generate_flag(username, 4)
-    shift = get_caesar_shift(username)
-    encrypted = caesar_encrypt(flag, shift)
-    return render_template('level4.html', encrypted=encrypted,
+    obfuscated_js = generate_obfuscated_js(username)
+    return render_template('level4.html', obfuscated_js=obfuscated_js,
                            timer_elapsed=timer_elapsed,
                            timer_done=timer_done)
 
